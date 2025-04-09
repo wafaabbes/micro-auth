@@ -32,6 +32,15 @@ pipeline {
         }
     }
 
+     stage('Tests unitaires') {
+            steps {
+                script {
+                    echo '===== Lancement des tests unitaires ====='
+                    sh 'npm test'  // Cette commande lance les tests dans ton projet
+                }
+            }
+        }
+
     post {
         always {
             echo 'Pipeline terminée.'
