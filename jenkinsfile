@@ -5,12 +5,11 @@ pipeline {
         NODE_ENV = 'production'
     }
 
-    stages {
-        stage('Checkout') {
-            steps {
-                git 'https://github.com/wafaabbes/micro-auth.git'
-            }
-        }
+   stage('Checkout') {
+    steps {
+        git branch: 'main', url: 'https://github.com/wafaabbes/micro-auth.git'
+    }
+}
 
         stage('Install') {
             steps {
