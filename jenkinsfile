@@ -19,13 +19,15 @@ pipeline {
         }
 
         stage('Install') {
-            steps {
+           steps {
                 script {
                     echo '===== Installation des dépendances ====='
                     sh 'npm install'
-                }
-            }
+                    sh 'ls node_modules'  // Vérifie que le dossier node_modules existe
+                    sh 'npm ls bcrypt'    // Vérifie si bcrypt est bien installé
         }
+    }
+}
 
          stage('Tests unitaires') {
             steps {
