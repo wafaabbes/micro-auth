@@ -1,38 +1,33 @@
 pipeline {
     agent any
 
-    environment {
-        NODE_ENV = 'development'
-    }
-
     stages {
-        stage('Checkout') {
+        stage('Declarative: Checkout SCM') {
             steps {
-                git url: 'https://github.com/wafaabbes/micro-auth.git', branch: 'main'
+                checkout scm
             }
         }
 
         stage('Vérification des versions') {
             steps {
-                sh '''
-                    echo "===== Node & NPM Versions ====="
-                    node -v
-                    npm -v
-                '''
+                script {
+                    echo '===== Node & NPM Versions ====='
+                    sh 'node -v'
+                    sh 'npm -v'
+                }
             }
         }
 
         stage('Install') {
             steps {
-                sh '''
-                    echo "===== Installation des dépendances ====="
-                    npm install
-                '''
+                script {
+                    echo '===== Installation des dépendances ====='
+                    sh 'npm install'
+                }
             }
         }
-    }
 
-     stage('Tests unitaires') {
+        stage('Tests unitaires') {
             steps {
                 script {
                     echo '===== Lancement des tests unitaires ====='
@@ -41,9 +36,10 @@ pipeline {
             }
         }
 
-    post {
-        always {
-            echo 'Pipeline terminée.'
+        stage('Declarative: Post Actions') {
+            steps {
+                echo 'Pipeline terminée.'
+            }
         }
     }
 }
