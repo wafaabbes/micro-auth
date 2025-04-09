@@ -1,14 +1,14 @@
-// Supprimez tous les commentaires avant de tester
 pipeline {
     agent any
 
-    options {
-        skipDefaultCheckout true // Évite le double checkout
+    tools {
+        // Utilisez un nom de tool configuré dans Jenkins
+        nodejs 'NodeJS_18_LTS' 
     }
 
     environment {
-        APP_NAME = "micro-auth"
-        RELEASE = "1.0.0"
+        // Force la version npm si nécessaire
+        npm_config_engine_strict = 'false'
     }
 
     stages {
@@ -19,27 +19,57 @@ pipeline {
                     branches: [[name: 'main']],
                     userRemoteConfigs: [[
                         url: 'https://github.com/wafaabbes/micro-auth.git',
-                        credentialsId: 'github'
-                    ]],
-                    extensions: [[
-                        $class: 'CleanBeforeCheckout'
+                        credentialsId: 'github',
+                        // Configuration Git avancée
+                        extensions: [
+                            [
+                                $class: 'CloneOption',
+                                depth: 1,
+                                noTags: false,
+                                reference: '',
+                                shallow: true
+                            ],
+                            [
+                                $class: 'LocalBranch',
+                                localBranch: 'main'
+                            ]
+                        ]
                     ]]
                 ])
             }
         }
 
-        stage('Build') {
+        stage('Setup Node') {
             steps {
-                sh 'node --version'
-                sh 'npm --version'
-                sh 'npm install'
+                sh """
+                # Vérification des versions
+                node --version
+                npm --version
+                
+                # Contournement temporaire pour EBADENGINE
+                npm config set engine-strict false
+                """
+            }
+        }
+
+        stage('Install & Test') {
+            steps {
+                sh """
+                # Installation propre
+                npm ci --prefer-offline --no-audit
+                
+                # Exécution des tests
+                npm run test:unit
+                npm run test:integration
+                """
             }
         }
     }
 
     post {
         always {
-            echo "Build status: ${currentBuild.currentResult}"
+            junit '**/test-results/**/*.xml' // Archive les résultats des tests
+            cleanWs() // Nettoyage de l'espace de travail
         }
     }
 }
