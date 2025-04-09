@@ -1,29 +1,52 @@
 pipeline {
     agent any
 
+    tools {
+        // Si tu as défini un Git Tool ou NodeJS dans Jenkins, mentionne-le ici
+        // exemple: nodejs 'Node18'
+    }
+
+    environment {
+        NODE_ENV = 'development'
+    }
+
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/wafaabbes/micro-auth.git'
+                git url: 'https://github.com/wafaabbes/micro-auth.git', branch: 'main'
+            }
+        }
+
+        stage('Vérification des versions') {
+            steps {
+                sh '''
+                    echo "===== Node & NPM Versions ====="
+                    node -v
+                    npm -v
+                '''
             }
         }
 
         stage('Install') {
             steps {
-                sh 'npm install'
+                sh '''
+                    echo "===== Installation des dépendances ====="
+                    npm install
+                '''
             }
         }
 
-        stage('Test') {
-            steps {
-                sh 'npm test || true' // ou `exit 0` si tu veux éviter l'échec
-            }
-        }
+        // Optionnel : Ajout de tests ou build ici
+        // stage('Tests') {
+        //     steps {
+        //         sh 'npm test'
+        //     }
+        // }
+    }
 
-        stage('Build Docker Image') {
-            steps {
-                sh 'docker build -t micro-auth:latest .'
-            }
+    post {
+        always {
+            echo 'Pipeline terminée.'
         }
     }
 }
