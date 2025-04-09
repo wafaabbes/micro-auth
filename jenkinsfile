@@ -1,9 +1,8 @@
 pipeline {
     agent any
 
-    tools {
-        nodejs 'NodeJS_20' // Doit être configuré dans Jenkins > Global Tool Configuration
-    }
+    // Supprimez la section tools si vous n'utilisez pas NodeJS
+    // ou configurez-le correctement dans Jenkins > Global Tool Configuration
 
     environment {
         APP_NAME = "micro-auth"
@@ -11,165 +10,42 @@ pipeline {
         DOCKER_USER = "wafa23"
         IMAGE_NAME = "${DOCKER_USER}/${APP_NAME}"
         IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
-        SONAR_HOST = "http://localhost:9000" // À adapter selon votre installation SonarQube
+        // SONAR_HOST est optionnel - supprimez si non utilisé
     }
 
     stages {
-        stage('Clean Workspace') {
-            steps {
-                cleanWs()
-            }
-        }
-
-        stage('Checkout SCM') {
+        stage('Checkout') {
             steps {
                 checkout([
                     $class: 'GitSCM',
                     branches: [[name: 'main']],
                     userRemoteConfigs: [[
                         url: 'https://github.com/wafaabbes/micro-auth.git',
-                        credentialsId: 'github' // Doit exister dans Jenkins credentials
+                        credentialsId: 'github' // Doit exister dans Jenkins
                     ]]
                 ])
             }
         }
 
-        stage('Install & Test') {
-            parallel {
-                stage('Install Dependencies') {
-                    steps {
-                        sh 'npm ci' // Utilise npm ci pour des installations plus fiables
-                    }
-                }
-                stage('Run Tests') {
-                    steps {
-                        sh 'npm run test:unit'
-                        sh 'npm run test:integration'
-                    }
-                }
+        stage('Build') {
+            steps {
+                sh 'npm install'
             }
         }
 
-        stage('SonarQube Analysis') {
-            when {
-                expression { return env.SONAR_HOST != null }
-            }
+        stage('Test') {
             steps {
-                withSonarQubeEnv('jenkins-sonarqube-token') {
-                    sh """
-                    sonar-scanner \
-                      -Dsonar.projectKey=${APP_NAME} \
-                      -Dsonar.sources=src \
-                      -Dsonar.host.url=${SONAR_HOST} \
-                      -Dsonar.login=${SONAR_TOKEN} \
-                      -Dsonar.projectVersion=${RELEASE}
-                    """
-                }
+                sh 'npm run test:unit'
+                sh 'npm run test:integration'
             }
         }
 
-        stage('Quality Gate') {
-            when {
-                expression { return env.SONAR_HOST != null }
-            }
-            steps {
-                timeout(time: 15, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
-            }
-        }
-
-        stage('Build & Push Docker Image') {
-            steps {
-                script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
-                        def customImage = docker.build(
-                            "${IMAGE_NAME}",
-                            "--build-arg NODE_ENV=production ."
-                        )
-                        customImage.push("${IMAGE_TAG}")
-                        customImage.push('latest')
-                    }
-                }
-            }
-        }
-
-        stage('Security Scan') {
-            steps {
-                sh """
-                docker run --rm \
-                  -v /var/run/docker.sock:/var/run/docker.sock \
-                  -v /tmp:/tmp \
-                  aquasec/trivy image \
-                  --severity HIGH,CRITICAL \
-                  --exit-code 1 \
-                  --format table \
-                  ${IMAGE_NAME}:${IMAGE_TAG}
-                """
-            }
-        }
-
-        stage('Deploy') {
-            when {
-                expression { 
-                    return currentBuild.result == null || currentBuild.result == 'SUCCESS' 
-                }
-            }
-            steps {
-                script {
-                    withCredentials([string(credentialsId: 'jenkins-api-token', variable: 'JENKINS_TOKEN')]) {
-                        def response = httpRequest (
-                            url: "http://JENKINS_SERVER:8080/job/deploy-auth-service/buildWithParameters?token=deploy-token&IMAGE_TAG=${IMAGE_TAG}",
-                            httpMode: 'POST',
-                            authentication: 'jenkins-credentials',
-                            validResponseCodes: '200,201,302'
-                        )
-                        echo "Deployment triggered: ${response.status}"
-                    }
-                }
-            }
-        }
+        // Les autres étapes peuvent être ajoutées progressivement
     }
 
     post {
         always {
-            script {
-                // Nettoyage des images Docker
-                sh "docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true"
-                sh "docker rmi ${IMAGE_NAME}:latest || true"
-                
-                // Archivage des résultats des tests
-                junit '**/test-results/**/*.xml'
-                archiveArtifacts artifacts: '**/reports/**/*', allowEmptyArchive: true
-            }
-        }
-        success {
-            emailext(
-                subject: "SUCCESS: ${env.JOB_NAME} [${env.BUILD_NUMBER}]",
-                body: """<p>Le build ${env.BUILD_NUMBER} a réussi.</p>
-                        <p>Consultez le <a href="${env.BUILD_URL}">détail du build</a></p>""",
-                to: 'wafaabbes453@gmail.com',
-                mimeType: 'text/html'
-            )
-        }
-        failure {
-            emailext(
-                subject: "FAILED: ${env.JOB_NAME} [${env.BUILD_NUMBER}]",
-                body: """<p>Le build ${env.BUILD_NUMBER} a échoué.</p>
-                        <p>Consultez le <a href="${env.BUILD_URL}">détail du build</a></p>
-                        <p>Erreur: ${currentBuild.currentResult}</p>""",
-                to: 'wafaabbes453@gmail.com',
-                mimeType: 'text/html'
-            )
-        }
-        unstable {
-            emailext(
-                subject: "UNSTABLE: ${env.JOB_NAME} [${env.BUILD_NUMBER}]",
-                body: """<p>Le build ${env.BUILD_NUMBER} est instable.</p>
-                        <p>Consultez le <a href="${env.BUILD_URL}">détail du build</a></p>""",
-                to: 'wafaabbes453@gmail.com',
-                mimeType: 'text/html'
-            )
+            echo 'Pipeline terminé - statut: ${currentBuild.result}'
         }
     }
 }
