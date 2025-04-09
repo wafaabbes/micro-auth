@@ -1,9 +1,11 @@
 pipeline {
     agent { label 'mon-pipeline1' }
+
     tools {
         jdk 'Java17'
         maven 'Maven3'
     }
+
     environment {
         APP_NAME = "gestion-clubs"
         RELEASE = "1.0.0"
@@ -13,6 +15,7 @@ pipeline {
         IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
         JENKINS_API_TOKEN = credentials("JENKINS_API_TOKEN")
     }
+
     stages {
         stage("Cleanup Workspace") {
             steps { cleanWs() }
@@ -24,48 +27,25 @@ pipeline {
             }
         }
 
-        stage("Build Application") {
+        stage("Install Dependencies") {
             steps {
-                sh "npm install && npm run build"
+                sh 'npm install'
             }
         }
 
-pipeline {
-  agent any
+        stage("Unit Tests") {
+            steps {
+                sh 'npm run test:unit'
+            }
+        }
 
-  stages {
-    stage('Install Dependencies') {
-      steps {
-        sh 'npm install'
-      }
-    }
+        stage("Integration Tests") {
+            steps {
+                sh 'npm run test:integration'
+            }
+        }
 
-    stage('Unit Tests') {
-      steps {
-        sh 'npm run test:unit'
-      }
-    }
-
-    stage('Integration Tests') {
-      steps {
-        sh 'npm run test:integration'
-      }
-    }
-  }
-
-  post {
-    always {
-      echo '🧪 Tests terminés.'
-    }
-    failure {
-      echo '❌ Échec des tests. Voir les logs.'
-    }
-  }
-}
-
-
-
-}        stage("SonarQube Analysis") {
+        stage("SonarQube Analysis") {
             steps {
                 script {
                     withSonarQubeEnv('jenkins-sonarqube-token') {
@@ -134,13 +114,18 @@ pipeline {
     }
 
     post {
+        always {
+            echo '🧪 Tests terminés.'
+        }
         failure {
+            echo '❌ Échec du pipeline. Voir les logs.'
             emailext body: '''${SCRIPT, template="groovy-html.template"}''',
                      subject: "${env.JOB_NAME} - Build # ${env.BUILD_NUMBER} - Failed",
                      mimeType: 'text/html',
                      to: "wafaabbes453@gmail.com"
         }
         success {
+            echo '✅ Pipeline terminé avec succès.'
             emailext body: '''${SCRIPT, template="groovy-html.template"}''',
                      subject: "${env.JOB_NAME} - Build # ${env.BUILD_NUMBER} - Successful",
                      mimeType: 'text/html',
@@ -148,4 +133,3 @@ pipeline {
         }
     }
 }
-
