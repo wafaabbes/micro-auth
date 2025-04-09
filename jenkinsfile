@@ -1,14 +1,25 @@
 pipeline {
     agent any
 
-    environment {
-        NODE_ENV = 'production'
+    options {
+        skipDefaultCheckout true // Évite le double checkout
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git 'https://github.com/wafaabbes/micro-auth.git'
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: 'main']], // Spécifie explicitement la branche main
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/wafaabbes/micro-auth.git',
+                        credentialsId: 'github' // Assurez-vous que ce credential existe
+                    ]],
+                    extensions: [
+                        [$class: 'CleanBeforeCheckout'],
+                        [$class: 'LocalBranch', localBranch: 'main']
+                    ]
+                ])
             }
         }
 
@@ -20,14 +31,27 @@ pipeline {
 
         stage('Test') {
             steps {
-                sh 'npm test || true'
+                sh 'npm run test:unit'
+                sh 'npm run test:integration'
             }
         }
 
         stage('Build Docker Image') {
-            steps {
-                sh 'docker build -t micro-auth:latest .'
+            when {
+                expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
             }
+            steps {
+                script {
+                    docker.build("your-image-name:${env.BUILD_NUMBER}")
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "Build terminé - Résultat: ${currentBuild.currentResult}"
+            cleanWs()
         }
     }
 }
