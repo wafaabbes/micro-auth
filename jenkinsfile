@@ -27,11 +27,11 @@ pipeline {
             }
         }
 
-        stage('Tests unitaires') {
+         stage('Tests unitaires') {
             steps {
                 script {
-                    echo '===== Lancement des tests unitaires ====='
-                    sh 'npm test'  // Cette commande lance les tests dans ton projet
+                    echo "===== Lancement des tests unitaires ====="
+                    sh 'npm test backend/tests/unit/authController.test.js'  // Mettre à jour avec le bon chemin
                 }
             }
         }
