@@ -1,15 +1,12 @@
-pipeline {
+ppipeline {
     agent any
 
-    environment {
-        NODE_ENV = 'production'
-    }
-
-   stage('Checkout') {
-    steps {
-        git branch: 'main', url: 'https://github.com/wafaabbes/micro-auth.git'
-    }
-}
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/wafaabbes/micro-auth.git'
+            }
+        }
 
         stage('Install') {
             steps {
@@ -19,7 +16,7 @@ pipeline {
 
         stage('Test') {
             steps {
-                sh 'npm test || true'
+                sh 'npm test || true' // ou `exit 0` si tu veux éviter l'échec
             }
         }
 
