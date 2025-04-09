@@ -1,22 +1,17 @@
 pipeline {
     agent any
 
-    // Supprime cette section si tu ne compiles pas avec Java/Maven
     tools {
-        jdk 'Java17'         // Nécessite configuration dans Jenkins > Global Tools
-        maven 'Maven3'       // Idem
+        nodejs 'NodeJS_20' // Configuré dans Jenkins > Global Tools
     }
 
     environment {
-        APP_NAME = "gestion-clubs"
+        APP_NAME = "micro-auth" // Changé pour correspondre au repo
         RELEASE = "1.0.0"
         DOCKER_USER = "wafa23"
-        DOCKER_PASS = credentials("DOCKER_HUB_PASSWORD") // si utilisé manuellement
         IMAGE_NAME = "${DOCKER_USER}/${APP_NAME}"
         IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
-        SONAR_TOKEN = credentials("SONARQUBE_TOKEN")     // Token Sonar dans Credentials
-        SONAR_HOST = "http://localhost:9000"             // Remplace si ton SonarQube est ailleurs
-        JENKINS_API_TOKEN = credentials("JENKINS_API_TOKEN")
+        SONAR_HOST = "http://localhost:9000"
     }
 
     stages {
@@ -26,7 +21,9 @@ pipeline {
 
         stage("Checkout from SCM") {
             steps {
-                git branch: 'main', credentialsId: 'github', url: 'https://github.com/wafaabbes/micro-auth'
+                git branch: 'main', 
+                credentialsId: 'github', 
+                url: 'https://github.com/wafaabbes/micro-auth.git'
             }
         }
 
@@ -50,35 +47,31 @@ pipeline {
 
         stage("SonarQube Analysis") {
             steps {
-                script {
-                    withSonarQubeEnv('jenkins-sonarqube-token') {
-                        sh """
-                        sonar-scanner \
-                          -Dsonar.projectKey=${APP_NAME} \
-                          -Dsonar.sources=src \
-                          -Dsonar.host.url=${SONAR_HOST} \
-                          -Dsonar.login=${SONAR_TOKEN}
-                        """
-                    }
+                withSonarQubeEnv('jenkins-sonarqube-token') {
+                    sh """
+                    sonar-scanner \
+                      -Dsonar.projectKey=${APP_NAME} \
+                      -Dsonar.sources=src \
+                      -Dsonar.host.url=${SONAR_HOST} \
+                      -Dsonar.login=${SONAR_TOKEN}
+                    """
                 }
             }
         }
 
         stage("Quality Gate") {
             steps {
-                script {
-                    waitForQualityGate abortPipeline: true
-                }
+                waitForQualityGate abortPipeline: true
             }
         }
 
         stage("Build & Push Docker Image") {
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'DOCKER_HUB_CREDENTIALS') {
-                        def docker_image = docker.build("${IMAGE_NAME}")
-                        docker_image.push("${IMAGE_TAG}")
-                        docker_image.push('latest')
+                    docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
+                        def dockerImage = docker.build("${IMAGE_NAME}")
+                        dockerImage.push("${IMAGE_TAG}")
+                        dockerImage.push('latest')
                     }
                 }
             }
@@ -99,13 +92,17 @@ pipeline {
 
         stage("Trigger CD Pipeline") {
             steps {
-                sh """
-                curl -v -k --user wafa:${JENKINS_API_TOKEN} -X POST \
-                -H 'cache-control: no-cache' \
-                -H 'content-type: application/x-www-form-urlencoded' \
-                --data-urlencode IMAGE_TAG=${IMAGE_TAG} \
-                'http://JENKINS_SERVER:8080/job/deploy-auth-service/buildWithParameters?token=deploy-token'
-                """
+                script {
+                    withCredentials([string(credentialsId: 'jenkins-api-token', variable: 'JENKINS_API_TOKEN')]) {
+                        sh """
+                        curl -v -k --user wafa:${JENKINS_API_TOKEN} -X POST \
+                        -H 'cache-control: no-cache' \
+                        -H 'content-type: application/x-www-form-urlencoded' \
+                        --data-urlencode IMAGE_TAG=${IMAGE_TAG} \
+                        'http://JENKINS_SERVER:8080/job/deploy-auth-service/buildWithParameters?token=deploy-token'
+                        """
+                    }
+                }
             }
         }
     }
