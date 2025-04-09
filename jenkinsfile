@@ -1,11 +1,6 @@
 pipeline {
     agent any
 
-    tools {
-        // Si tu as défini un Git Tool ou NodeJS dans Jenkins, mentionne-le ici
-        // exemple: nodejs 'Node18'
-    }
-
     environment {
         NODE_ENV = 'development'
     }
@@ -35,13 +30,6 @@ pipeline {
                 '''
             }
         }
-
-        // Optionnel : Ajout de tests ou build ici
-        // stage('Tests') {
-        //     steps {
-        //         sh 'npm test'
-        //     }
-        // }
     }
 
     post {
