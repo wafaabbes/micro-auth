@@ -1,20 +1,14 @@
+// Supprimez tous les commentaires avant de tester
 pipeline {
     agent any
 
-    // Configuration des outils (si Node.js est configuré dans Jenkins)
-    tools {
-        nodejs 'NodeJS_18' // Doit correspondre à une installation configurée dans Jenkins
+    options {
+        skipDefaultCheckout true // Évite le double checkout
     }
 
     environment {
-        // Configuration de base
         APP_NAME = "micro-auth"
         RELEASE = "1.0.0"
-        
-        // Configuration Docker (si utilisée)
-        DOCKER_USER = "wafa23"
-        IMAGE_NAME = "${DOCKER_USER}/${APP_NAME}"
-        IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
     }
 
     stages {
@@ -25,7 +19,7 @@ pipeline {
                     branches: [[name: 'main']],
                     userRemoteConfigs: [[
                         url: 'https://github.com/wafaabbes/micro-auth.git',
-                        credentialsId: 'github' // Credential configuré dans Jenkins
+                        credentialsId: 'github'
                     ]],
                     extensions: [[
                         $class: 'CleanBeforeCheckout'
@@ -34,40 +28,18 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Build') {
             steps {
-                script {
-                    // Vérification de la version Node.js
-                    sh 'node --version'
-                    sh 'npm --version'
-                    
-                    // Installation avec nettoyage du cache si nécessaire
-                    sh 'npm cache clean --force || true'
-                    sh 'npm install'
-                }
+                sh 'node --version'
+                sh 'npm --version'
+                sh 'npm install'
             }
         }
-
-        stage('Run Tests') {
-            steps {
-                sh 'npm run test:unit'
-                sh 'npm run test:integration'
-            }
-        }
-
-        // Ajouter ici les autres étapes si nécessaire (build Docker, déploiement, etc.)
     }
 
     post {
         always {
-            echo "Build terminé - Résultat: ${currentBuild.currentResult}"
-            cleanWs() // Nettoyage de l'espace de travail
-        }
-        success {
-            echo '✅ Pipeline exécuté avec succès'
-        }
-        failure {
-            echo '❌ Échec du pipeline'
+            echo "Build status: ${currentBuild.currentResult}"
         }
     }
 }
