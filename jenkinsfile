@@ -35,7 +35,8 @@ pipeline {
             steps {
                 dir('backend') {
                     sh '''
-                    npx jest --ci --reporters=default --reporters=jest-junit
+                    # Lancer les tests avec un nombre réduit de workers pour éviter les erreurs liées aux processus enfants
+                    npx jest --ci --reporters=default --reporters=jest-junit --maxWorkers=2
                     '''
                 }
             }
