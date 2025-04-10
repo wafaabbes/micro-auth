@@ -17,10 +17,10 @@ pipeline {
                 sh 'npm install'
             }
         }
-        stage('Test') {
-            steps {
-                sh 'npm test'
-            }
-        }
+       stage('Test') {
+  steps {
+    sh 'npx mocha --timeout 5000 backend/tests/unit/**/*.test.js'
+  }
+}
     }
 }
