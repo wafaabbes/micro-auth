@@ -2,80 +2,53 @@ pipeline {
     agent any
 
     environment {
-        NODE_ENV = 'test'
-        // Ajoutez ici d'autres variables si nécessaire
+        // Force npm à ignorer les dépendances optionnelles inutiles
+        NPM_CONFIG_OPTIONAL = 'false'
+        // Utilise le cache Jenkins pour node_modules
+        npm_config_cache = '${WORKSPACE}/.npm'
     }
 
     stages {
-        stage('Checkout Code') {
+        stage('Checkout') {
             steps {
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: '*/main']],
-                    extensions: [],
-                    userRemoteConfigs: [[
-                        url: 'https://github.com/wafaabbes/micro-auth.git',
-                        credentialsId: 'github-credentials' // Ajoutez des credentials si nécessaire
-                    ]]
-                ])
+                checkout scm
             }
         }
 
-        stage('Vérification Environnement') {
+        stage('Install') {
             steps {
                 script {
-                    echo '===== Versions ====='
-                    def nodeVersion = sh(returnStdout: true, script: 'node -v').trim()
-                    def npmVersion = sh(returnStdout: true, script: 'npm -v').trim()
-                    echo "Node.js: ${nodeVersion}"
-                    echo "NPM: ${npmVersion}"
-                    
-                    // Vérification des outils de build
-                    sh 'gcc --version || echo "GCC non installé"'
-                    sh 'make --version || echo "Make non installé"'
-                    sh 'python3 --version || echo "Python non installé"'
+                    // Nettoie le cache et saute les dépendances optionnelles
+                    sh '''
+                        npm cache clean --force
+                        npm ci --no-optional --prefer-offline
+                    '''
                 }
             }
         }
 
-        stage('Installation Dépendances') {
+        stage('Build') {
             steps {
-                script {
-                    echo '===== Nettoyage et Installation ====='
-                    sh 'npm cache clean --force'
-                    sh 'rm -rf node_modules package-lock.json'
-                    
-                    // Installation avec journalisation détaillée
-                    sh 'npm install --loglevel verbose' 
-                    
-                    // Vérification des dépendances critiques
-                    sh 'npm ls bcrypt jsonwebtoken || true'
-                    
-                    // Audit de sécurité
-                    sh 'npm audit --production || true'
-                }
+                sh 'npm run build' // Adaptez à votre script de build
             }
         }
 
-        stage('Tests Unitaires') {
+        stage('Test') {
             steps {
-                script {
-                    echo '===== Exécution des Tests ====='
-                    sh 'npm test'
-                }
+                sh 'npm test' // Exécute les tests
+            }
+        }
+
+        stage('Archive Artifacts') {
+            steps {
+                archiveArtifacts artifacts: 'dist/**/*' // Archive le résultat du build
             }
         }
     }
 
     post {
         always {
-            echo '===== Nettoyage Final ====='
-            archiveArtifacts artifacts: '**/test-results.xml', allowEmptyArchive: true
-            junit '**/test-results.xml'
-        }
-        failure {
-            echo '===== ÉCHEC DU PIPELINE ====='
-            // Ajoutez ici des notifications (email, Slack, etc.)
+            cleanWs() // Nettoie l'espace de travail
         }
     }
 }
