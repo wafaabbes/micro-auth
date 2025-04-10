@@ -6,7 +6,7 @@ pipeline {
     }
 
     options {
-        skipDefaultCheckout(true) // Évite le double checkout
+        skipDefaultCheckout(true)
         timeout(time: 30, unit: 'MINUTES')
     }
 
@@ -17,10 +17,7 @@ pipeline {
                     $class: 'GitSCM',
                     branches: [[name: 'main']],
                     extensions: [],
-                    userRemoteConfigs: [[
-                        url: 'https://github.com/wafaabbes/micro-auth.git',
-                        credentialsId: '' // Ajoutez un credentialId si nécessaire
-                    ]]
+                    userRemoteConfigs: [[url: 'https://github.com/wafaabbes/micro-auth.git']]
                 ])
             }
         }
@@ -28,7 +25,8 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 dir('backend') {
-                    sh 'npm ci --no-audit' // Plus fiable que npm install
+                    sh 'npm ci --no-audit'
+                    sh 'npm install jest jest-junit --save-dev' // Ajoute Jest et le reporter JUnit
                 }
             }
         }
@@ -36,7 +34,14 @@ pipeline {
         stage('Run Tests') {
             steps {
                 dir('backend') {
-                    sh 'npx mocha --timeout 5000 tests/unit/**/*.test.js'
+                    sh '''
+                        npx jest --ci --reporters=default --reporters=jest-junit
+                    '''
+                }
+            }
+            post {
+                always {
+                    junit 'backend/junit.xml' // Publie les résultats au format JUnit
                 }
             }
         }
@@ -50,7 +55,7 @@ pipeline {
             echo '❌ Échec du pipeline. Vérifiez les logs.'
         }
         always {
-            deleteDir() // Alternative à cleanWs
+            deleteDir()
         }
     }
 }
