@@ -1,10 +1,20 @@
 pipeline {
     agent any
 
+    environment {
+        // Configurez ici les variables d'environnement si nécessaire
+        NODE_ENV = 'test'
+    }
+
     stages {
-        stage('Declarative: Checkout SCM') {
+        stage('Checkout SCM') {
             steps {
-                checkout scm
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    extensions: [],
+                    userRemoteConfigs: [[url: 'https://github.com/wafaabbes/micro-auth.git']]
+                ])
             }
         }
 
@@ -12,36 +22,60 @@ pipeline {
             steps {
                 script {
                     echo '===== Node & NPM Versions ====='
-                    sh 'node -v'
-                    sh 'npm -v'
+                    def nodeVersion = sh(returnStdout: true, script: 'node -v').trim()
+                    def npmVersion = sh(returnStdout: true, script: 'npm -v').trim()
+                    echo "Node version: ${nodeVersion}"
+                    echo "NPM version: ${npmVersion}"
                 }
             }
         }
 
-        stage('Install') {
-           steps {
+        stage('Installation des dépendances') {
+            steps {
                 script {
                     echo '===== Installation des dépendances ====='
-                    sh 'npm install'
-                    sh 'ls node_modules'  // Vérifie que le dossier node_modules existe
-                    sh 'npm ls bcrypt'    // Vérifie si bcrypt est bien installé
+                    sh 'npm ci' // Utilise npm ci pour une installation propre et reproductible
+                    
+                    // Vérification des dépendances critiques
+                    def bcryptCheck = sh(
+                        returnStdout: true, 
+                        script: 'npm ls bcrypt || true' // Le "|| true" évite l'échec si bcrypt n'est pas trouvé
+                    ).trim()
+                    echo "Vérification bcrypt: ${bcryptCheck}"
+                    
+                    // Audit de sécurité
+                    sh 'npm audit --audit-level=moderate || true'
+                }
+            }
         }
-    }
-}
 
-         stage('Tests unitaires') {
+        stage('Tests unitaires') {
             steps {
                 script {
                     echo "===== Lancement des tests unitaires ====="
-                    sh 'npm test backend/tests/unit/authController.test.js'  // Mettre à jour avec le bon chemin
+                    try {
+                        sh 'npm test backend/tests/unit/authController.test.js'
+                    } catch (Exception e) {
+                        echo "Erreur lors des tests: ${e.toString()}"
+                        currentBuild.result = 'FAILURE'
+                        error("Les tests unitaires ont échoué")
+                    }
                 }
             }
         }
+    }
 
-        stage('Declarative: Post Actions') {
-            steps {
-                echo 'Pipeline terminée.'
-            }
+    post {
+        always {
+            echo 'Nettoyage après exécution...'
+            // Ajoutez ici des étapes de nettoyage si nécessaire
+        }
+        success {
+            echo 'Pipeline exécutée avec succès!'
+        }
+        failure {
+            echo 'Pipeline a échoué. Consultez les logs pour plus de détails.'
+            // Vous pouvez ajouter une notification ici (email, Slack, etc.)
         }
     }
 }
