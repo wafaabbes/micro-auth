@@ -2,9 +2,8 @@ pipeline {
     agent any
 
     environment {
-        // Configuration npm optimale
         npm_config_cache = "${WORKSPACE}/.npm"
-        npm_config_omit = "optional"  // Nouvelle syntaxe pour exclure les dépendances optionnelles
+        npm_config_omit = "optional"
         npm_config_prefer_offline = "true"
     }
 
@@ -22,55 +21,47 @@ pipeline {
 
         stage('Install') {
             steps {
-                script {
-                    // Nettoyage et installation propre
-                    sh '''
-                        npm cache clean --force
-                        npm ci --omit=optional --prefer-offline
-                    '''
-                }
+                sh '''
+                    npm cache clean --force
+                    npm ci --omit=optional --prefer-offline
+                '''
             }
         }
 
         stage('Build') {
             steps {
-                sh 'npm run build'  // Adaptez à votre script de build
+                sh 'npm run build'
             }
         }
 
         stage('Test') {
             steps {
-                sh 'npm test'  // Exécution des tests
+                sh 'npm test'
             }
         }
 
         stage('Deploy') {
             when {
-                branch 'main'  // Exemple: ne déployer que depuis la branche main
+                branch 'main'
             }
             steps {
-                // Ajoutez ici vos étapes de déploiement
+                // Ajoutez ici vos commandes de déploiement
+                echo 'Deployment would happen here'
             }
         }
     }
 
     post {
         always {
-            cleanWs()  // Nettoyage de l'espace de travail
-            script {
-                // Archivage des résultats de build
-                archiveArtifacts artifacts: 'dist/**/*', allowEmptyArchive: true
-                // Archivage des rapports de test si existants
-                junit '**/test-results.xml' 
-            }
+            cleanWs()
+            archiveArtifacts artifacts: 'dist/**/*', allowEmptyArchive: true
+            junit '**/test-results.xml' 
         }
         success {
-            // Notification en cas de succès
-            echo 'Build réussi!'
+            echo 'Build succeeded!'
         }
         failure {
-            // Notification en cas d'échec
-            echo 'Build échoué!'
+            echo 'Build failed!'
         }
     }
 }
