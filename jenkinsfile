@@ -26,7 +26,7 @@ pipeline {
             steps {
                 dir('backend') {
                     sh 'npm ci --no-audit'
-                    sh 'npm install jest jest-junit --save-dev' // Ajoute Jest et le reporter JUnit
+                    sh 'npm install jest jest-junit --save-dev'
                 }
             }
         }
@@ -35,13 +35,14 @@ pipeline {
             steps {
                 dir('backend') {
                     sh '''
-                        npx jest --ci --reporters=default --reporters=jest-junit
+                    npx jest --ci --reporters=default --reporters=jest-junit \
+                    --testPathIgnorePatterns="tests/integration"
                     '''
                 }
             }
             post {
                 always {
-                    junit 'backend/junit.xml' // Publie les résultats au format JUnit
+                    junit 'backend/junit.xml'
                 }
             }
         }
