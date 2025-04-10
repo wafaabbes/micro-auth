@@ -2,64 +2,66 @@ pipeline {
     agent any
 
     environment {
-        // Configurez ici les variables d'environnement si nécessaire
         NODE_ENV = 'test'
+        // Ajoutez ici d'autres variables si nécessaire
     }
 
     stages {
-        stage('Checkout SCM') {
+        stage('Checkout Code') {
             steps {
                 checkout([
                     $class: 'GitSCM',
                     branches: [[name: '*/main']],
                     extensions: [],
-                    userRemoteConfigs: [[url: 'https://github.com/wafaabbes/micro-auth.git']]
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/wafaabbes/micro-auth.git',
+                        credentialsId: 'github-credentials' // Ajoutez des credentials si nécessaire
+                    ]]
                 ])
             }
         }
 
-        stage('Vérification des versions') {
+        stage('Vérification Environnement') {
             steps {
                 script {
-                    echo '===== Node & NPM Versions ====='
+                    echo '===== Versions ====='
                     def nodeVersion = sh(returnStdout: true, script: 'node -v').trim()
                     def npmVersion = sh(returnStdout: true, script: 'npm -v').trim()
-                    echo "Node version: ${nodeVersion}"
-                    echo "NPM version: ${npmVersion}"
+                    echo "Node.js: ${nodeVersion}"
+                    echo "NPM: ${npmVersion}"
+                    
+                    // Vérification des outils de build
+                    sh 'gcc --version || echo "GCC non installé"'
+                    sh 'make --version || echo "Make non installé"'
+                    sh 'python3 --version || echo "Python non installé"'
                 }
             }
         }
 
-        stage('Installation des dépendances') {
+        stage('Installation Dépendances') {
             steps {
                 script {
-                    echo '===== Installation des dépendances ====='
-                    sh 'npm ci' // Utilise npm ci pour une installation propre et reproductible
+                    echo '===== Nettoyage et Installation ====='
+                    sh 'npm cache clean --force'
+                    sh 'rm -rf node_modules package-lock.json'
+                    
+                    // Installation avec journalisation détaillée
+                    sh 'npm install --loglevel verbose' 
                     
                     // Vérification des dépendances critiques
-                    def bcryptCheck = sh(
-                        returnStdout: true, 
-                        script: 'npm ls bcrypt || true' // Le "|| true" évite l'échec si bcrypt n'est pas trouvé
-                    ).trim()
-                    echo "Vérification bcrypt: ${bcryptCheck}"
+                    sh 'npm ls bcrypt jsonwebtoken || true'
                     
                     // Audit de sécurité
-                    sh 'npm audit --audit-level=moderate || true'
+                    sh 'npm audit --production || true'
                 }
             }
         }
 
-        stage('Tests unitaires') {
+        stage('Tests Unitaires') {
             steps {
                 script {
-                    echo "===== Lancement des tests unitaires ====="
-                    try {
-                        sh 'npm test backend/tests/unit/authController.test.js'
-                    } catch (Exception e) {
-                        echo "Erreur lors des tests: ${e.toString()}"
-                        currentBuild.result = 'FAILURE'
-                        error("Les tests unitaires ont échoué")
-                    }
+                    echo '===== Exécution des Tests ====='
+                    sh 'npm test'
                 }
             }
         }
@@ -67,15 +69,13 @@ pipeline {
 
     post {
         always {
-            echo 'Nettoyage après exécution...'
-            // Ajoutez ici des étapes de nettoyage si nécessaire
-        }
-        success {
-            echo 'Pipeline exécutée avec succès!'
+            echo '===== Nettoyage Final ====='
+            archiveArtifacts artifacts: '**/test-results.xml', allowEmptyArchive: true
+            junit '**/test-results.xml'
         }
         failure {
-            echo 'Pipeline a échoué. Consultez les logs pour plus de détails.'
-            // Vous pouvez ajouter une notification ici (email, Slack, etc.)
+            echo '===== ÉCHEC DU PIPELINE ====='
+            // Ajoutez ici des notifications (email, Slack, etc.)
         }
     }
 }
