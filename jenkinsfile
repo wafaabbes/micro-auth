@@ -3,21 +3,42 @@ pipeline {
 
     environment {
         NODE_ENV = 'test'
+        // Ajouter la version de Node si utilisée avec nvm/ndenv
+        // NODE_VERSION = '16.14.0' 
+    }
+
+    options {
+        timeout(time: 15, unit: 'MINUTES')  // Timeout global
+        disableConcurrentBuilds()           // Évite les exécutions concurrentes
     }
 
     stages {
-
         stage('Checkout Code') {
             steps {
-                // Récupère le code depuis le repo Git
-                git url: 'https://github.com/wafaabbes/micro-auth.git', branch: 'main'
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: 'main']],
+                    extensions: [],
+                    userRemoteConfigs: [[url: 'https://github.com/wafaabbes/micro-auth.git']]
+                ])
+            }
+        }
+
+        stage('Setup Node') {
+            steps {
+                dir('backend') {
+                    // Optionnel : Installation d'une version spécifique de Node
+                    // nvm use $NODE_VERSION || nvm install $NODE_VERSION
+                    sh 'node --version'
+                    sh 'npm --version'
+                }
             }
         }
 
         stage('Install Dependencies') {
             steps {
                 dir('backend') {
-                    sh 'npm install'
+                    sh 'npm ci'  // Plus fiable que npm install pour CI
                 }
             }
         }
@@ -25,7 +46,12 @@ pipeline {
         stage('Run Tests') {
             steps {
                 dir('backend') {
-                    sh 'npx mocha --timeout 5000 tests/unit/**/*.test.js'
+                    sh 'npx mocha --timeout 5000 --colors tests/unit/**/*.test.js'
+                }
+            }
+            post {
+                always {
+                    junit 'backend/test-results.xml' // Si Mocha génère un rapport JUnit
                 }
             }
         }
@@ -34,9 +60,13 @@ pipeline {
     post {
         success {
             echo '✅ Pipeline terminé avec succès.'
+            // Optionnel : Notification (Slack, email...)
         }
         failure {
             echo '❌ Échec du pipeline. Vérifie les logs.'
+        }
+        always {
+            // Nettoyage si nécessaire
         }
     }
 }
