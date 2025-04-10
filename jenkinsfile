@@ -2,26 +2,31 @@ pipeline {
     agent any
 
     environment {
-        // Force npm à ignorer les dépendances optionnelles inutiles
-        NPM_CONFIG_OPTIONAL = 'false'
-        // Utilise le cache Jenkins pour node_modules
-        npm_config_cache = '${WORKSPACE}/.npm'
+        // Configuration npm optimale
+        npm_config_cache = "${WORKSPACE}/.npm"
+        npm_config_omit = "optional"  // Nouvelle syntaxe pour exclure les dépendances optionnelles
+        npm_config_prefer_offline = "true"
     }
 
     stages {
         stage('Checkout') {
             steps {
-                checkout scm
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    extensions: [],
+                    userRemoteConfigs: [[url: 'https://github.com/wafaabbes/micro-auth.git']]
+                ])
             }
         }
 
         stage('Install') {
             steps {
                 script {
-                    // Nettoie le cache et saute les dépendances optionnelles
+                    // Nettoyage et installation propre
                     sh '''
                         npm cache clean --force
-                        npm ci --no-optional --prefer-offline
+                        npm ci --omit=optional --prefer-offline
                     '''
                 }
             }
@@ -29,26 +34,43 @@ pipeline {
 
         stage('Build') {
             steps {
-                sh 'npm run build' // Adaptez à votre script de build
+                sh 'npm run build'  // Adaptez à votre script de build
             }
         }
 
         stage('Test') {
             steps {
-                sh 'npm test' // Exécute les tests
+                sh 'npm test'  // Exécution des tests
             }
         }
 
-        stage('Archive Artifacts') {
+        stage('Deploy') {
+            when {
+                branch 'main'  // Exemple: ne déployer que depuis la branche main
+            }
             steps {
-                archiveArtifacts artifacts: 'dist/**/*' // Archive le résultat du build
+                // Ajoutez ici vos étapes de déploiement
             }
         }
     }
 
     post {
         always {
-            cleanWs() // Nettoie l'espace de travail
+            cleanWs()  // Nettoyage de l'espace de travail
+            script {
+                // Archivage des résultats de build
+                archiveArtifacts artifacts: 'dist/**/*', allowEmptyArchive: true
+                // Archivage des rapports de test si existants
+                junit '**/test-results.xml' 
+            }
+        }
+        success {
+            // Notification en cas de succès
+            echo 'Build réussi!'
+        }
+        failure {
+            // Notification en cas d'échec
+            echo 'Build échoué!'
         }
     }
 }
