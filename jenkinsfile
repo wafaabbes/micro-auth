@@ -1,67 +1,47 @@
 pipeline {
     agent any
 
-    environment {
-        npm_config_cache = "${WORKSPACE}/.npm"
-        npm_config_omit = "optional"
-        npm_config_prefer_offline = "true"
-    }
-
     stages {
+        // Étape 1: Récupération du code
         stage('Checkout') {
             steps {
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: '*/main']],
-                    extensions: [],
-                    userRemoteConfigs: [[url: 'https://github.com/wafaabbes/micro-auth.git']]
-                ])
+                checkout scm
             }
         }
 
+        // Étape 2: Installation des dépendances
         stage('Install') {
             steps {
-                sh '''
-                    npm cache clean --force
-                    npm ci --omit=optional --prefer-offline
-                '''
+                sh 'npm install'
             }
         }
 
+        // Étape 3: Build du projet
         stage('Build') {
             steps {
                 sh 'npm run build'
             }
         }
 
+        // Étape 4: Exécution des tests
         stage('Test') {
             steps {
                 sh 'npm test'
             }
         }
-
-        stage('Deploy') {
-            when {
-                branch 'main'
-            }
-            steps {
-                // Ajoutez ici vos commandes de déploiement
-                echo 'Deployment would happen here'
-            }
-        }
     }
 
+    // Post-traitement
     post {
         always {
+            // Nettoyage de l'espace de travail
             cleanWs()
-            archiveArtifacts artifacts: 'dist/**/*', allowEmptyArchive: true
-            junit '**/test-results.xml' 
         }
         success {
-            echo 'Build succeeded!'
+            echo 'Le pipeline a réussi!'
         }
         failure {
-            echo 'Build failed!'
+            echo 'Le pipeline a échoué!'
         }
     }
 }
