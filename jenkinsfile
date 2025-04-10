@@ -8,14 +8,22 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                git url: 'https://github.com/wafaabbes/micro-auth.git', branch: 'main'
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: 'main']],
+                    extensions: [],
+                    userRemoteConfigs: [[url: 'https://github.com/wafaabbes/micro-auth.git']]
+                ])
             }
         }
 
         stage('Install Dependencies') {
             steps {
                 dir('backend') {
-                    sh 'npm install'
+                    // Utilisez npm ci pour une installation plus fiable en CI
+                    sh 'npm ci --no-audit'  // Ignore les avertissements de sécurité temporairement
+                    // OU pour mettre à jour les dépendances dépréciées :
+                    // sh 'npm update'
                 }
             }
         }
@@ -23,14 +31,12 @@ pipeline {
         stage('Run Tests') {
             steps {
                 dir('backend') {
-                    sh 'npx mocha --timeout 5000 tests/unit/**/*.test.js'
+                    sh 'npx mocha --timeout 5000 --exit tests/unit/**/*.test.js'
                 }
             }
             post {
                 always {
-                    // Ajoutez au moins une étape valide ici
-                    echo 'Tests terminés (succès ou échec)'
-                    // Optionnel : archive les résultats de tests
+                    junit 'backend/test-results.xml' // Si vous générez un rapport JUnit
                     archiveArtifacts artifacts: 'backend/test-results.xml', allowEmptyArchive: true
                 }
             }
@@ -39,15 +45,15 @@ pipeline {
 
     post {
         success {
-            echo '✅ Pipeline terminé avec succès.'
+            echo '✅ Pipeline terminé avec succès'
+            // slackSend channel: '#devops', message: 'Pipeline réussi'
         }
         failure {
-            echo '❌ Échec du pipeline. Vérifie les logs.'
+            echo '❌ Échec du pipeline'
+            // slackSend channel: '#devops', message: 'Pipeline échoué'
         }
-        // Si vous gardez un bloc always au niveau global, ajoutez des steps
         always {
-            echo 'Nettoyage...'
-            // Actions de nettoyage éventuelles
+            cleanWs() // Nettoyage de l'espace de travail
         }
     }
 }
