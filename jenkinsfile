@@ -1,47 +1,11 @@
-pipeline {
-    agent any
-
-    stages {
-        // Étape 1: Récupération du code
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-
-        // Étape 2: Installation des dépendances
-        stage('Install') {
-            steps {
-                sh 'npm install'
-            }
-        }
-
-        // Étape 3: Build du projet
-        stage('Build') {
-            steps {
-                sh 'npm run build'
-            }
-        }
-
-        // Étape 4: Exécution des tests
-        stage('Test') {
-            steps {
-                sh 'npm test'
-            }
-        }
+stage('Checkout Code') {
+    steps {
+        git url: 'https://github.com/your-org/your-app-repo.git', branch: 'main'
     }
+}
 
-    // Post-traitement
-    post {
-        always {
-            // Nettoyage de l'espace de travail
-            cleanWs()
-        }
-        success {
-            echo 'Le pipeline a réussi!'
-        }
-        failure {
-            echo 'Le pipeline a échoué!'
-        }
+stage('Build & Test with Maven') {
+    steps {
+        sh 'mvn clean install'
     }
 }
