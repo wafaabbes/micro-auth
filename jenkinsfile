@@ -1,6 +1,6 @@
 stage('Checkout Code') {
     steps {
-        git url: 'https://github.com/your-org/your-app-repo.git', branch: 'main'
+        git url: 'https://github.com/wafaabbes/micro-auth.git', branch: 'main'
     }
 }
 
