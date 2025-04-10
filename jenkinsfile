@@ -35,8 +35,7 @@ pipeline {
             steps {
                 dir('backend') {
                     sh '''
-                    npx jest --ci --reporters=default --reporters=jest-junit \
-                    --testPathIgnorePatterns="tests/integration"
+                    npx jest --ci --reporters=default --reporters=jest-junit
                     '''
                 }
             }
