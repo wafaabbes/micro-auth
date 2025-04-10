@@ -46,6 +46,51 @@ pipeline {
                 }
             }
         }
+
+        stage('Build and Scan Docker Image') {
+            steps {
+                script {
+                    def imageName = 'wafaabbes/micro-auth'
+                    def imageTag = "v${env.BUILD_NUMBER}"
+                    def fullImage = "${imageName}:${imageTag}"
+
+                    dir('backend') {
+                        // Build Docker image
+                        sh "docker build -t ${fullImage} ."
+
+                        // Scan de sécurité avec Trivy
+                        sh '''
+                            # Installer Trivy si non disponible
+                            if ! command -v trivy &> /dev/null; then
+                                echo "🔧 Installation de Trivy..."
+                                sudo apt-get update && sudo apt-get install -y wget
+                                wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.50.1_Linux-64bit.deb
+                                sudo dpkg -i trivy_0.50.1_Linux-64bit.deb
+                            fi
+
+                            echo "🔍 Scan de sécurité avec Trivy..."
+                            trivy image --exit-code 1 --severity CRITICAL,HIGH ${fullImage}
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    def imageName = 'wafaabbes/micro-auth'
+                    def imageTag = "v${env.BUILD_NUMBER}"
+                    def fullImage = "${imageName}:${imageTag}"
+
+                    withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                        sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+                    }
+
+                    sh "docker push ${fullImage}"
+                }
+            }
+        }
     }
 
     post {
