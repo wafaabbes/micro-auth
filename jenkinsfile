@@ -1,26 +1,42 @@
 pipeline {
     agent any
 
+    environment {
+        NODE_ENV = 'test'
+    }
+
     stages {
-        stage('Clean Workspace') {
-            steps {
-                deleteDir()
-            }
-        }
+
         stage('Checkout Code') {
             steps {
+                // Récupère le code depuis le repo Git
                 git url: 'https://github.com/wafaabbes/micro-auth.git', branch: 'main'
             }
         }
-        stage('Build') {
+
+        stage('Install Dependencies') {
             steps {
-                sh 'npm install'
+                dir('backend') {
+                    sh 'npm install'
+                }
             }
         }
-       stage('Test') {
-  steps {
-    sh 'npx mocha --timeout 5000 backend/tests/unit/**/*.test.js'
-  }
-}
+
+        stage('Run Tests') {
+            steps {
+                dir('backend') {
+                    sh 'npx mocha --timeout 5000 tests/unit/**/*.test.js'
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ Pipeline terminé avec succès.'
+        }
+        failure {
+            echo '❌ Échec du pipeline. Vérifie les logs.'
+        }
     }
 }
