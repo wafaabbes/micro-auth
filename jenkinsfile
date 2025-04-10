@@ -1,18 +1,22 @@
 pipeline {
     agent any
-    stages {
-        stage('Checkout Code') {
-    steps {
-        git url: 'https://github.com/wafaabbes/micro-auth.git', branch: 'main'
-    }
-}
 
+    stages {
+        stage('Clean Workspace') {
+            steps {
+                deleteDir()
+            }
+        }
+        stage('Checkout Code') {
+            steps {
+                git url: 'https://github.com/wafaabbes/micro-auth.git', branch: 'main'
+            }
+        }
         stage('Build') {
             steps {
                 sh 'npm install'
             }
         }
-
         stage('Test') {
             steps {
                 sh 'npm test'
@@ -20,4 +24,3 @@ pipeline {
         }
     }
 }
-
