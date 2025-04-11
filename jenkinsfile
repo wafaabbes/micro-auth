@@ -3,60 +3,78 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = "micro-auth"
+        DOCKER_TAG = "${env.BUILD_ID}"  // Utilisation du numéro de build comme tag
         K8S_NAMESPACE = "mon-namespace"
         K8S_DEPLOYMENT_FILE = "k8s/deployment.yaml"
-        SLACK_CHANNEL = "#deployments"
     }
 
     stages {
         stage('Checkout') {
             steps {
-                echo 'https://github.com/wafaabbes/micro-auth.git'
-                checkout scm
+                echo 'Récupération du code depuis GitHub'
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    extensions: [],
+                    userRemoteConfigs: [[url: 'https://github.com/wafaabbes/micro-auth.git']]
+                ])
             }
         }
 
         stage('Build') {
             steps {
-                echo 'Construire l\'image Docker'
+                echo 'Construction de l\'image Docker'
                 script {
-                    // Construire l'image Docker à partir du Dockerfile
-                    sh 'docker build -t ${DOCKER_IMAGE} .'
+                    // Utilisation de BuildKit pour de meilleures performances
+                    sh 'DOCKER_BUILDKIT=1 docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .'
                 }
             }
         }
 
         stage('Test') {
             steps {
-                echo 'Exécuter les tests unitaires'
+                echo 'Exécution des tests unitaires'
                 script {
-                    // Installer les dépendances et exécuter les tests avec Jest
-                    sh 'npm install'
-                    sh 'npm run test'  // Assurez-vous que cette commande fonctionne dans ton package.json
+                    // Installation en mode développement seulement
+                    sh 'npm ci --only=development'
+                    sh 'npm run test'
+                    
+                    // Archivage des résultats des tests
+                    junit 'junit.xml'  // Assurez-vous que Jest génère ce fichier
                 }
             }
         }
 
         stage('Deploy') {
             steps {
-                echo 'Déployer le projet sur Kubernetes'
+                echo 'Déploiement sur Kubernetes'
                 script {
-                    // Déployer sur Kubernetes
-                    sh 'kubectl apply -f ${K8S_DEPLOYMENT_FILE} --namespace=${K8S_NAMESPACE}'
+                    // Taggage et push de l'image (optionnel)
+                    // sh 'docker push ${DOCKER_IMAGE}:${DOCKER_TAG}'
+                    
+                    // Déploiement Kubernetes avec mise à jour de l'image
+                    sh """
+                        kubectl set image deployment/micro-auth \
+                        micro-auth=${DOCKER_IMAGE}:${DOCKER_TAG} \
+                        --namespace=${K8S_NAMESPACE} --record
+                    """
                 }
             }
         }
     }
 
-   post {
-    success {
-        echo 'Le pipeline a réussi !'
-        // La ligne de notification Slack est supprimée
+    post {
+        success {
+            echo 'Pipeline exécuté avec succès!'
+            // Ici vous pourriez ajouter une notification Slack
+        }
+        failure {
+            echo 'Échec du pipeline'
+            // Ici vous pourriez ajouter une notification Slack
+        }
+        always {
+            // Nettoyage des conteneurs et images
+            sh 'docker system prune -f'
+        }
     }
-    failure {
-        echo 'Le pipeline a échoué.'
-        // La ligne de notification Slack est supprimée
-    }
-}
-
 }
