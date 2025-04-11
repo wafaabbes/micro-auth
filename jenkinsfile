@@ -48,16 +48,15 @@ pipeline {
         }
     }
 
-    post {
-        success {
-            echo 'Le pipeline a réussi !'
-            // Envoi d'une notification Slack sur un déploiement réussi
-            slackSend(channel: SLACK_CHANNEL, message: "Le déploiement a réussi sur l'environnement de production.")
-        }
-        failure {
-            echo 'Le pipeline a échoué.'
-            // Envoi d'une notification Slack sur un échec
-            slackSend(channel: SLACK_CHANNEL, message: "Le déploiement a échoué.")
-        }
+   post {
+    success {
+        echo 'Le pipeline a réussi !'
+        // La ligne de notification Slack est supprimée
     }
+    failure {
+        echo 'Le pipeline a échoué.'
+        // La ligne de notification Slack est supprimée
+    }
+}
+
 }
