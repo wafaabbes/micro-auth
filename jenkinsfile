@@ -5,6 +5,10 @@ pipeline {
         maven 'Maven3' // Utiliser le nom défini dans Jenkins (Global Tool Configuration)
     }
 
+    environment {
+        SONAR_TOKEN = credentials('sonar-token') // Chargement du token depuis Jenkins Credentials
+    }
+
     stages {
         stage('Git Checkout') {
             steps {
@@ -32,15 +36,16 @@ pipeline {
 
         stage('Static Code Analysis') {
             steps {
-                withSonarQubeEnv(credentialsId: 'sonar-api') {
-                    sh 'mvn sonar:sonar'
+                // Utilisation de l'installation SonarQubeLocal dans le pipeline
+                withSonarQubeEnv(installationName: 'SonarQubeLocal') {
+                    sh 'mvn sonar:sonar -Dsonar.login=${SONAR_TOKEN}' // Envoi du token dans la commande SonarQube
                 }
             }
         }
 
         stage('Quality Gate') {
             steps {
-                waitForQualityGate abortPipeline: false, credentialsId: 'sonar-api'
+                waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token'
             }
         }
     }
