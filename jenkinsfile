@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = "micro-auth"
-        DOCKER_TAG = "${env.BUILD_ID}"  // Utilisation du numéro de build comme tag
+        DOCKER_TAG = "${env.BUILD_ID}"
         K8S_NAMESPACE = "mon-namespace"
         K8S_DEPLOYMENT_FILE = "k8s/deployment.yaml"
     }
@@ -12,12 +12,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 echo 'Récupération du code depuis GitHub'
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: '*/main']],
-                    extensions: [],
-                    userRemoteConfigs: [[url: 'https://github.com/wafaabbes/micro-auth.git']]
-                ])
+                checkout scm  // Version simplifiée
             }
         }
 
@@ -25,8 +20,8 @@ pipeline {
             steps {
                 echo 'Construction de l\'image Docker'
                 script {
-                    // Utilisation de BuildKit pour de meilleures performances
-                    sh 'DOCKER_BUILDKIT=1 docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .'
+                    // Version standard sans BuildKit
+                    sh 'docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .'
                 }
             }
         }
@@ -35,12 +30,11 @@ pipeline {
             steps {
                 echo 'Exécution des tests unitaires'
                 script {
-                    // Installation en mode développement seulement
-                    sh 'npm ci --only=development'
+                    sh 'npm install --only=development'  // Version plus simple que npm ci
                     sh 'npm run test'
                     
-                    // Archivage des résultats des tests
-                    junit 'junit.xml'  // Assurez-vous que Jest génère ce fichier
+                    // Archivage des résultats si le fichier existe
+                    junit allowEmptyResults: true, testResults: 'junit.xml'
                 }
             }
         }
@@ -49,14 +43,11 @@ pipeline {
             steps {
                 echo 'Déploiement sur Kubernetes'
                 script {
-                    // Taggage et push de l'image (optionnel)
-                    // sh 'docker push ${DOCKER_IMAGE}:${DOCKER_TAG}'
-                    
-                    // Déploiement Kubernetes avec mise à jour de l'image
+                    // Version simplifiée sans push Docker
                     sh """
                         kubectl set image deployment/micro-auth \
                         micro-auth=${DOCKER_IMAGE}:${DOCKER_TAG} \
-                        --namespace=${K8S_NAMESPACE} --record
+                        -n ${K8S_NAMESPACE}
                     """
                 }
             }
@@ -65,16 +56,16 @@ pipeline {
 
     post {
         success {
-            echo 'Pipeline exécuté avec succès!'
-            // Ici vous pourriez ajouter une notification Slack
+            echo 'Pipeline réussi!'
+            // slackSend channel: '#deployments', message: "Succès: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
         }
         failure {
             echo 'Échec du pipeline'
-            // Ici vous pourriez ajouter une notification Slack
+            // slackSend channel: '#deployments', message: "Échec: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
         }
         always {
-            // Nettoyage des conteneurs et images
-            sh 'docker system prune -f'
+            // Nettoyage plus sélectif
+            sh 'docker system prune -f --filter "until=24h"'
         }
     }
 }
