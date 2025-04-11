@@ -1,20 +1,63 @@
 pipeline {
     agent any
+
+    environment {
+        DOCKER_IMAGE = "mon-image"
+        K8S_NAMESPACE = "mon-namespace"
+        K8S_DEPLOYMENT_FILE = "k8s/deployment.yaml"
+        SLACK_CHANNEL = "#deployments"
+    }
+
     stages {
+        stage('Checkout') {
+            steps {
+                echo 'Vérification du code depuis Git'
+                checkout scm
+            }
+        }
+
         stage('Build') {
             steps {
-                echo 'Construire le projet'
+                echo 'Construire l\'image Docker'
+                script {
+                    // Construire l'image Docker à partir du Dockerfile
+                    sh 'docker build -t ${DOCKER_IMAGE} .'
+                }
             }
         }
+
         stage('Test') {
             steps {
-                echo 'Tester le projet'
+                echo 'Exécuter les tests unitaires'
+                script {
+                    // Installer les dépendances et exécuter les tests avec Jest
+                    sh 'npm install'
+                    sh 'npm run test'  // Assurez-vous que cette commande fonctionne dans ton package.json
+                }
             }
         }
+
         stage('Deploy') {
             steps {
-                echo 'Déployer le projet'
+                echo 'Déployer le projet sur Kubernetes'
+                script {
+                    // Déployer sur Kubernetes
+                    sh 'kubectl apply -f ${K8S_DEPLOYMENT_FILE} --namespace=${K8S_NAMESPACE}'
+                }
             }
+        }
+    }
+
+    post {
+        success {
+            echo 'Le pipeline a réussi !'
+            // Envoi d'une notification Slack sur un déploiement réussi
+            slackSend(channel: SLACK_CHANNEL, message: "Le déploiement a réussi sur l'environnement de production.")
+        }
+        failure {
+            echo 'Le pipeline a échoué.'
+            // Envoi d'une notification Slack sur un échec
+            slackSend(channel: SLACK_CHANNEL, message: "Le déploiement a échoué.")
         }
     }
 }
