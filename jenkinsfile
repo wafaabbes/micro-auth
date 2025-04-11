@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = "mon-image"
+        DOCKER_IMAGE = "micro-auth"
         K8S_NAMESPACE = "mon-namespace"
         K8S_DEPLOYMENT_FILE = "k8s/deployment.yaml"
         SLACK_CHANNEL = "#deployments"
@@ -11,7 +11,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                echo 'Vérification du code depuis Git'
+                echo 'https://github.com/wafaabbes/micro-auth.git'
                 checkout scm
             }
         }
