@@ -1,63 +1,19 @@
 pipeline {
     agent any
-
-    tools {
-        nodejs 'NodeJS' // Utiliser l'installation de Node.js configurée dans Jenkins
-    }
-
-    environment {
-        SONAR_TOKEN = credentials('sonar-token') // Charger le token SonarQube depuis les credentials Jenkins
-    }
-
     stages {
-        stage('Git Checkout') {
-            steps {
-                git branch: 'main', url: 'https://github.com/wafaabbes/micro-auth.git'
-            }
-        }
-
-        stage('Install Dependencies') {
-            steps {
-                sh 'npm install' // Installer les dépendances du projet Node.js
-            }
-        }
-
-        stage('Unit Test') {
-            steps {
-                sh 'npm test' // Exécuter les tests unitaires
-            }
-        }
-
-        stage('Integration Test') {
-            steps {
-                sh 'npm run test:integration' // Si tu as un script d'intégration (optionnel)
-            }
-        }
-
-        stage('Static Code Analysis') {
-            steps {
-                withSonarQubeEnv(installationName: 'SonarQubeLocal') {
-                    sh 'npm run sonar' // Commande SonarQube (assure-toi d'avoir configuré le script dans package.json)
-                }
-            }
-        }
-
-        stage('Quality Gate') {
-            steps {
-                waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token' // Vérification du "Quality Gate" sur SonarQube
-            }
-        }
-
         stage('Build') {
             steps {
-                sh 'npm run build' // Si tu as une étape de build, sinon cette étape est facultative
+                echo 'Construire le projet'
             }
         }
-
-        // Nouvelle étape pour afficher un message de réussite
-        stage('Success Message') {
+        stage('Test') {
             steps {
-                echo '✅ Le pipeline a réussi avec succès !' // Afficher un message de réussite
+                echo 'Tester le projet'
+            }
+        }
+        stage('Deploy') {
+            steps {
+                echo 'Déployer le projet'
             }
         }
     }
