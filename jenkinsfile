@@ -1,107 +1,85 @@
 pipeline {
     agent any
 
-    environment {
-        NODE_ENV = 'test'
+    tools {
+        maven 'Maven 3.8.5' // à configurer dans Jenkins > Global Tool Configuration
     }
 
-    options {
-        skipDefaultCheckout(true)
-        timeout(time: 30, unit: 'MINUTES')
+    environment {
+        SONARQUBE_CREDENTIALS = credentials('sonar-api') // ID défini dans Jenkins
     }
 
     stages {
-        stage('Checkout Code') {
-            steps {
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: 'main']],
-                    extensions: [],
-                    userRemoteConfigs: [[url: 'https://github.com/wafaabbes/micro-auth.git']]
-                ])
-            }
-        }
-
-        stage('Install Dependencies') {
-            steps {
-                dir('backend') {
-                    sh 'npm ci --no-audit'
-                    sh 'npm install jest jest-junit --save-dev'
-                }
-            }
-        }
-
-        stage('Run Tests') {
-            steps {
-                dir('backend') {
-                    sh '''
-                    # Lancer les tests avec un nombre réduit de workers pour éviter les erreurs liées aux processus enfants
-                    npx jest --ci --reporters=default --reporters=jest-junit --maxWorkers=2
-                    '''
-                }
-            }
-            post {
-                always {
-                    junit 'backend/junit.xml'
-                }
-            }
-        }
-
-        stage('Build and Scan Docker Image') {
+        stage('Git Checkout') {
             steps {
                 script {
-                    def imageName = 'wafaabbes/micro-auth'
-                    def imageTag = "v${env.BUILD_NUMBER}"
-                    def fullImage = "${imageName}:${imageTag}"
+                    git branch: 'main', url: 'https://github.com/wafaabbes/mrdevops_javaapplication.git'
+                }
+            }
+        }
 
-                    dir('backend') {
-                        // Build Docker image
-                        sh "docker build -t ${fullImage} ."
+        stage('Unit Testing') {
+            steps {
+                script {
+                    sh 'mvn test'
+                }
+            }
+        }
 
-                        // Scan de sécurité avec Trivy
-                        sh '''
-                            # Installer Trivy si non disponible
-                            if ! command -v trivy &> /dev/null; then
-                                echo "🔧 Installation de Trivy..."
-                                sudo apt-get update && sudo apt-get install -y wget
-                                wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.50.1_Linux-64bit.deb
-                                sudo dpkg -i trivy_0.50.1_Linux-64bit.deb
-                            fi
+        stage('Integration Testing') {
+            steps {
+                script {
+                    // Assurez-vous que les tests d'intégration sont bien séparés via failsafe plugin
+                    sh 'mvn verify -DskipUnitTests=true'
+                }
+            }
+        }
 
-                            echo "🔍 Scan de sécurité avec Trivy..."
-                            trivy image --exit-code 1 --severity CRITICAL,HIGH ${fullImage}
-                        '''
+        stage('Maven Build') {
+            steps {
+                script {
+                    sh 'mvn clean install'
+                }
+            }
+        }
+
+        stage('Static Code Analysis (SonarQube)') {
+            steps {
+                script {
+                    withSonarQubeEnv(credentialsId: 'sonar-api') {
+                        sh 'mvn clean verify sonar:sonar'
                     }
                 }
             }
         }
 
-        stage('Push Docker Image') {
+        stage('Quality Gate Status') {
             steps {
                 script {
-                    def imageName = 'wafaabbes/micro-auth'
-                    def imageTag = "v${env.BUILD_NUMBER}"
-                    def fullImage = "${imageName}:${imageTag}"
-
-                    withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                        sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
-                    }
-
-                    sh "docker push ${fullImage}"
+                    waitForQualityGate abortPipeline: true
                 }
+            }
+        }
+
+        stage('Archive Artifacts') {
+            steps {
+                archiveArtifacts artifacts: '**/target/*.jar', fingerprint: true
             }
         }
     }
 
     post {
+        always {
+            echo 'Pipeline terminée.'
+        }
         success {
-            echo '✅ Pipeline terminé avec succès.'
+            echo 'Déploiement réussi.'
         }
         failure {
-            echo '❌ Échec du pipeline. Vérifiez les logs.'
-        }
-        always {
-            deleteDir()
+            echo 'Échec de la pipeline.'
+            mail to: 'devops@example.com',
+                 subject: "🚨 Pipeline Jenkins échouée : ${env.JOB_NAME} [${env.BUILD_NUMBER}]",
+                 body: "Voir les logs ici : ${env.BUILD_URL}"
         }
     }
 }
