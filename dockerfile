@@ -1,28 +1,31 @@
-# Étape de build
+# Étape 1: Builder
 FROM node:18-alpine AS builder
+
 WORKDIR /app
+
+# Copier les fichiers de configuration
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+
+# Installer les dépendances (y compris Vite)
+RUN npm install --omit=dev
+
+# Copier tout le reste du projet
 COPY . .
+
+# Construire le projet avec Vite
 RUN npm run build && \
     rm -rf src .gitignore .dockerignore *.md
 
-# Étape d'exécution
+# Étape 2: Créer l'image finale
 FROM node:18-alpine
+
 WORKDIR /app
-ENV NODE_ENV=production
 
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY package.json .
+# Copier les fichiers de build de l'étape précédente
+COPY --from=builder /app /app
 
-RUN addgroup --system appgroup && \
-    adduser --system --ingroup appgroup appuser && \
-    chown -R appuser:appgroup /app
-USER appuser
-
-HEALTHCHECK --interval=30s --timeout=3s \
-  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {if(r.statusCode !== 200) throw new Error()})"
+# Démarrer l'application
+CMD ["npm", "start"]
 
 EXPOSE 3000/tcp
 CMD ["node", "dist/index.js"]
