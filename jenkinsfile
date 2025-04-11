@@ -13,7 +13,7 @@ pipeline {
         stage('Git Checkout') {
             steps {
                 script {
-                    git branch: 'main', url: 'https://github.com/wafaabbes/mrdevops_javaapplication.git'
+                    git branch: 'main', url: 'https://github.com/wafaabbes/micro-auth.git'
                 }
             }
         }
@@ -77,7 +77,7 @@ pipeline {
         }
         failure {
             echo 'Échec de la pipeline.'
-            mail to: 'devops@example.com',
+            mail to: 'wafaabbes453@gmail.com',
                  subject: "🚨 Pipeline Jenkins échouée : ${env.JOB_NAME} [${env.BUILD_NUMBER}]",
                  body: "Voir les logs ici : ${env.BUILD_URL}"
         }
