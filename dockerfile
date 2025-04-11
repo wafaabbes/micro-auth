@@ -1,18 +1,20 @@
+# Étape de construction
 FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Nettoyer le cache et installer les dépendances
+# D'abord copier uniquement les fichiers de dépendances
 COPY package.json package-lock.json ./
-RUN npm cache clean --force && \
-    npm install --legacy-peer-deps --ignore-scripts && \
-    npm install terser
 
-# Copie du code et build
+# Nettoyer le cache et installer les dépendances
+RUN npm cache clean --force && \
+    npm install --legacy-peer-deps --prefer-offline
+
+# Copier le reste du code et builder
 COPY . .
 RUN npm run build
 
-# Étape de production
+# Étape de production (image finale légère)
 FROM node:18-alpine
 WORKDIR /app
 COPY --from=builder /app/dist ./dist
